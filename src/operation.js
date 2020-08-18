@@ -1,8 +1,8 @@
 import dHiveClient from './dhive'
 
-export async function streamOperations(callbacks) {
+export async function streamOperations(callbacks, options = {}) {
   return new Promise((resolve, reject) => {
-    const stream = dHiveClient.blockchain.getOperationsStream()
+    const stream = dHiveClient.blockchain.getOperationsStream(options)
     stream.on('data', (op) => {
       if (callbacks && callbacks.length > 0) {
         callbacks.forEach(callback => {

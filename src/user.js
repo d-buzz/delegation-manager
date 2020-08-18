@@ -11,8 +11,7 @@ export async function readReferredUsers() {
   for (let user of users) {
     usersMap[user.account] = user
   }
-  const loadedUsers = loadReferredUsers()
-  usersMap = { ...usersMap, ...loadedUsers }
+  usersMap = { ...usersMap, ...(loadReferredUsers()) }
   return usersMap
 }
 

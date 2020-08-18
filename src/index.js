@@ -19,6 +19,11 @@ function getDelegatedUsers() {
   return users.filter(u => u.status === 'delegated').map(u => u.account)
 }
 
+function containsUser(username) {
+  const usernames = Object.keys(referredUsers)
+  return usernames.includes(username)
+}
+
 // #2.2 streaming operations and listen to account creation operation
 function whenReferredUserCreated(op) {
   const name = op.op[0]
@@ -32,14 +37,16 @@ function whenReferredUserCreated(op) {
         const referred = beneficiaries.filter(b => b.name === config.delegationAccount)
         if (referred && referred.length > 0 && referred[0].label === 'referrer') {
           const username = account.new_account_name
-          const user = {}
-          user[username] = {
-            account: username,
-            weight: referred[0].weight,
-            timestamp: new Date(op.timestamp + 'Z').getTime()
-          }
           console.log('referred user has been created:', username)
-          addToReferredUsers(user)
+          if (!containsUser(username)) {
+            referredUsers = addToReferredUsers([{
+              account: username,
+              weight: referred[0].weight,
+              timestamp: new Date(op.timestamp + 'Z').getTime()
+            }])
+          } else {
+            console.log(`referred user @${username} already exists. skip.`)
+          }
         }
       }
     }
@@ -52,8 +59,8 @@ function whenReferredUserTakeActions(op) {
   if (['comment', 'vote', 'transfer', 'custom_json'].includes(name)){
     const username = getOperationPerformer(op)
     const users = getInactiveUsers()
-    // console.log(`${name} op by @${username} at ${op.timestamp}`)
     if (users.includes(username)) {
+      console.log(`@${username} has performed [${name}] opeation at ${op.timestamp}`)
       delegateToUser(username)
     }
   }
@@ -89,7 +96,11 @@ async function checkDelegatorAccountHP() {
 async function processOperations() {
   // stream operations
   console.log('#1 stream operations starts')
-  await streamOperations([whenReferredUserCreated, whenReferredUserTakeActions])
+  await streamOperations([whenReferredUserCreated, whenReferredUserTakeActions], {
+    from: 46146671
+    // block 46146673 (@leo.ryan20 performs custom_json)
+    // block 45977166 (@leo.ryan20 account is created)
+  })
   console.log('stream operations ended')
 }
 
