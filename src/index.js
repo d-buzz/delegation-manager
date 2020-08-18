@@ -1,66 +1,118 @@
 // implement the delegation manager according to the description in the post:
 //
 
-import fs from 'fs'
 import config from '../config' // #1 load config
-import { getReferredAccounts } from './hiveonboard'
+import { streamOperations, getOperationPerformer } from './operation'
+import { readReferredUsers, saveReferredUsers, addToReferredUsers } from './user'
 
-async function readReferredUsers() {
+// object keeps the latest referred users
+// user status: { inactive, delegated, muted, expired, beneficiary_removed, graduated }
+let referredUsers = {}
 
-  // #2.1 read referred users from hiveonboard api
-  const accounts = await getReferredAccounts(config.delegationAccount)
-  console.log('accounts', accounts)
+function getInactiveUsers() {
+  const users = Object.values(referredUsers)
+  return users.filter(u => u.status == null ).map(u => u.account)
+}
 
-  if (fs.existsSync('../users.json')) {
-    const users = require('../users.json')
+function getDelegatedUsers() {
+  const users = Object.values(referredUsers)
+  return users.filter(u => u.status === 'delegated').map(u => u.account)
+}
+
+// #2.2 streaming operations and listen to account creation operation
+function whenReferredUserCreated(op) {
+  const name = op.op[0]
+  if (['create_claimed_account', 'account_create'].includes(name)) {
+    const account = op.op[1]
+    let jsonMetadata = account.json_metadata
+    if (jsonMetadata) {
+      jsonMetadata = JSON.parse(jsonMetadata)
+      const beneficiaries = jsonMetadata.beneficiaries
+      if (beneficiaries && beneficiaries.length > 0) {
+        const referred = beneficiaries.filter(b => b.name === config.delegationAccount)
+        if (referred && referred.length > 0 && referred[0].label === 'referrer') {
+          const username = account.new_account_name
+          const user = {}
+          user[username] = {
+            account: username,
+            weight: referred[0].weight,
+            timestamp: new Date(op.timestamp + 'Z').getTime()
+          }
+          console.log('referred user has been created:', username)
+          addToReferredUsers(user)
+        }
+      }
+    }
   }
-
 }
 
-async function saveToReferredUsers() {
-  // #3 save referred accounts into file
-
-  // '../users.json'
+// #5 listen to account activities, and delegate to the user if RC is less than minimum needs
+function whenReferredUserTakeActions(op) {
+  const name = op.op[0]
+  if (['comment', 'vote', 'transfer', 'custom_json'].includes(name)){
+    const username = getOperationPerformer(op)
+    const users = getInactiveUsers()
+    // console.log(`${name} op by @${username} at ${op.timestamp}`)
+    if (users.includes(username)) {
+      delegateToUser(username)
+    }
+  }
 }
 
-async function removeFromReferredUsers() {
+async function delegateToUser(username) {
+  // delegate to user, when
+  // 1. user has little RC
+  // 2. user has low Hive Power (own + received delegation)
+  // 3. user is not muted
+  // 4. we have not delegated to the user before
+  // 5. default beneficiary setting is not removed
+  console.log('delegate to', username)
 
+  // #10 if delegation process fail, notify the admin account
 }
 
-async function delegateToUser() {
-   // #10 if delegation process fail, notify the admin account
+async function removeDelegationIfNeeded(username) {
+  // delegate to user, when
+  // 1. user has enough Hive Power (own + received delegation)
+  // 2. user is muted
+  // 3. delegation length exceeds defined cycle
+  // 4. default beneficiary setting is removed
+  console.log('remove delegation to', username)
+
+  // #10 if delegation process fail, notify the admin account
 }
 
-async function streamBlocks() {
-  // listen to stream blocks with one thread
-
-  // #2.2 streaming blocks and listen to account creation
-
-  // #5 listen to account activities, and delegate to the user if RC is less than minimum needs
-}
-
-async function pollingStatus() {
-
-  // #4 if muted (check muted accounts), remove delegation, and remove from referred accounts
-
-  // #6 if delegation exceeds defined cycle, remove delegation
-
-  // #7 if dafault beneficiary settings is removed by user, remove delegation
-
-  // #8 if effective SP of user is enough, remove delegation
-
+async function checkDelegatorAccountHP() {
   // #9 if the delegator account has no enough HP, send warning to the admin account
+}
 
+async function processOperations() {
+  // stream operations
+  console.log('#1 stream operations starts')
+  await streamOperations([whenReferredUserCreated, whenReferredUserTakeActions])
+  console.log('stream operations ended')
+}
+
+async function monitoringAccounts() {
+  console.log('#2 monitoring account status')
+  const job = () => {
+    console.log('checking referred users status...')
+    const users = getDelegatedUsers()
+    users.forEach(u => removeDelegationIfNeeded(u))
+    checkDelegatorAccountHP()
+  }
+  job()
+  setInterval(job, parseFloat(config.checkCycleMins) * 60 * 1000)
 }
 
 async function main() {
-  const referredUsers = await readReferredUsers()
+  referredUsers = await readReferredUsers()
+  saveReferredUsers(referredUsers)
 
   await Promise.all([
-    () => streamBlocks(referredUsers),
-    () => pollingStatus(referredUsers)
+    processOperations(),
+    monitoringAccounts()
   ])
-
 }
 
 main()

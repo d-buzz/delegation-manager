@@ -3,6 +3,7 @@
   "delegationAmount": "10",
   "delegationLength": "30",
   "beneficiaryRemoval": "true",
+  "checkCycleMins": "30",
   "minPostRC": "2",
   "muteAccount": "sportstalkmute",
   "hpWarning": "150",
