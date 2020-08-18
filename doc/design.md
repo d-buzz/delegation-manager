@@ -40,7 +40,7 @@ delegationMuteMsg = Default message for users who’s delegation is revoked due 
 delegationBeneficiaryMsg = Default message for users who’s delegation is revoked for removing beneficiary under open standard
 delegationMaxMsg = Default message for users with enough HP to support themselves
 
-2.) Program has to listen for account create events on the HIVE blockchain and parse the json_metadata if the created account was referred by the delegationAccount.Bonus: Program may query the hiveonboard API (https://hiveonboard.com/api/referrer/sportstalksocial with dappAccount replacing sportstalksocial) or query a Hivemind server on first startup in order to retrieve historical referred accounts this way it could prevent parsing the whole blockchain history to gain all data.
+2.) Program has to listen for account create events on the HIVE blockchain and parse the json_metadata if the created account was referred by the delegationAccount. Bonus: Program may query the hiveonboard API (https://hiveonboard.com/api/referrer/sportstalksocial with dappAccount replacing sportstalksocial) or query a Hivemind server on first startup in order to retrieve historical referred accounts this way it could prevent parsing the whole blockchain history to gain all data.
 
 3.) When new user is detected then program will need to store user in the state file of accounts that have been referred.
 
