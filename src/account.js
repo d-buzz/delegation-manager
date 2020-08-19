@@ -189,4 +189,10 @@ export async function delegatePower(wif, username, receiver, hp) {
 
 export async function sendMessage(wif, from, to, message) {
   // transfer
+  await dHiveClient.broadcast.transfer({
+    from,
+    to,
+    amount: '0.001 HIVE',
+    message
+  }, wif)
 }

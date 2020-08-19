@@ -31,6 +31,14 @@ function containsUser(username) {
   return usernames.includes(username)
 }
 
+function updateUser(user) {
+  referredUsers = addToReferredUsers([user])
+}
+
+function getUser(username) {
+  return referredUsers[username]
+}
+
 // ---- Streaming Operations -----
 
 // #2.2 streaming operations and listen to account creation operation
@@ -42,7 +50,7 @@ function whenReferredUserCreated(op) {
       const username = account.new_account_name
       console.log('referred user has been created:', username)
       if (!containsUser(username)) {
-        referredUsers = addToReferredUsers([{
+        updateUser([{
           account: username,
           weight: referred[0].weight,
           timestamp: new Date(op.timestamp + 'Z').getTime()
@@ -102,20 +110,38 @@ async function hasSetBeneficiary(username) {
 
 async function hasDelegatedTo(username) {
   console.log('\thas delegated to ?', username)
-  return false
+  const delegated = getDelegatedUsers()
+  if (delegated.includes(username)) {
+    return true
+  } else {
+    return false
+  }
 }
 
 async function hasExceededDelegatinLength(username) {
   console.log('\thas exceeded delegation length ?', username)
-  return false
+  const user = getUser(username)
+  if (user.status === 'delegatd' && Date.now() > user.delegatedAt + parseFloat(config.delegationLength) * 86400 * 1000) {
+    return true
+  } else {
+    return false
+  }
 }
 
 // --- Manipulations ---
 
 async function notify(receiver, message) {
+  await sendMessage(process.env.ACTIVE_KEY, config.delegationAccount, receiver, message)
+}
+
+async function notifyUser(user, message) {
   if (isTrue(config.notifyUser)) {
-    await sendMessage(process.env.ACTIVE_KEY, config.delegationAccount, receiver, message)
+    await notify(user, message)
   }
+}
+
+async function notifyAdmin(message) {
+  await notify(config.adminAccount, message)
 }
 
 async function delegateToUser(username) {
@@ -131,41 +157,56 @@ async function delegateToUser(username) {
     && !await hasDelegatedTo(username))
   {
     console.log(`delegate ${config.delegationAmount} HP to @${username}`)
-    await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, parseFloat(config.delegationAmount))
-  }
+    try {
+      await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, parseFloat(config.delegationAmount))
+    } catch(e) {
+        // #10 if delegation process fail, notify the admin account
+      notifyAdmin(`Delegation Manager: failed to delegate Hive Power to the user @${username}`)
+    }
 
-  // #10 if delegation process fail, notify the admin account
+    const user = getUser(username)
+    user.status = 'delegated'
+    user.delegatedAt = Date.now()
+    user.delegationAmount = parseFloat(config.delegationAmount)
+    updateUser(user)
+  }
 }
 
 async function removeDelegationIfNeeded(username) {
-  // delegate to user, when
+  const user = getUser(username)
+
+  async function removeDelegation() {
+    await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, 0)
+    user.delegationRemovedAt = Date.now()
+    updateUser(user)
+  }
+
+  // remove delegation to the user, when
   // 1. user has enough Hive Power (own + received delegation)
   // 2. user is muted
   // 3. delegation length exceeds defined cycle
   // 4. default beneficiary setting is removed
-
-  async function removeDelegation() {
-    await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, 0)
-  }
-
   console.log(`do we need to remove delegation to @${username}`)
-
   if (await hasEnoughHP(username)) {
     console.log(`remove delegation to @${username}`)
+    user.status = 'graduated'
     await removeDelegation()
-    notify(username, config.delegationMaxMsg)
+    notifyUser(username, config.delegationMaxMsg)
   } else if (await isMuted(username)) {
     console.log(`remove delegation to @${username}`)
+    user.status = 'muted'
     await removeDelegation()
-    notify(username, config.delegationMuteMsg)
-  } else if (await hasExceededDelegatinLength(username)) { //
+    notifyUser(username, config.delegationMuteMsg)
+  } else if (await hasExceededDelegatinLength(username)) {
+    user.status = 'expired'
     console.log(`remove delegation to @${username}`)
     await removeDelegation()
-    notify(username, config.delegationLengthMsg)
+    notifyUser(username, config.delegationLengthMsg)
   } else if (isTrue(config.beneficiaryRemoval) && !await hasSetBeneficiary(username)) {
+    user.status = 'beneficiary_removed'
     console.log(`remove delegation to @${username}`)
     await removeDelegation()
-    notify(username, config.delegationBeneficiaryMsg)
+    notifyUser(username, config.delegationBeneficiaryMsg)
   } else {
     console.log(`keep the delegation to @${username}`)
   }
@@ -178,7 +219,7 @@ async function checkDelegatorAccountHP() {
   if (hpWarning >= 0 && hp < hpWarning) {
     // send warning
     console.log('no sufficient HP for delegation')
-    notify(config.adminAccount, config.hpWarningMsg)
+    notifyAdmin(`Delegation Manager: You need more HP to continue supporting new users via delegation. You have only ${hp.toFixed(3)} now`)
   }
 }
 
