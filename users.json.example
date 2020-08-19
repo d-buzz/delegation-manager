@@ -1,0 +1,39 @@
+{
+  "databook1": {
+    "account": "databook1",
+    "weight": 300,
+    "timestamp": 1596343794000,
+    "status": "delegated",
+    "delegatedAt": 1596729753000,
+    "delegationAmount": 10.011477931832882
+  },
+  "jarajones": {
+    "account": "jarajones",
+    "weight": 300,
+    "timestamp": 1594089720000
+  },
+  "leo.ryan20": {
+    "account": "leo.ryan20",
+    "weight": 300,
+    "timestamp": 1597227285000,
+    "status": "delegated",
+    "delegatedAt": 1597272258000,
+    "delegationAmount": 10.005741994991796
+  },
+  "onlinefantasy": {
+    "account": "onlinefantasy",
+    "weight": 300,
+    "timestamp": 1597380525000,
+    "status": "delegated",
+    "delegatedAt": 1597675038000,
+    "delegationAmount": 10.001493323185047
+  },
+  "rnherman": {
+    "account": "rnherman",
+    "weight": 300,
+    "timestamp": 1597093125000,
+    "status": "delegated",
+    "delegatedAt": 1597100766000,
+    "delegationAmount": 10.007551366802764
+  }
+}

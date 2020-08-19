@@ -9,7 +9,7 @@ import { getMutedAccounts, getAccountRC, delegatablePower, usablePower, getAccou
   from './account'
 
 function isTrue(setting) {
-  return ('' + setting).toLowerCase() === 'true'
+  return setting && ('' + setting).toLowerCase() === 'true'
 }
 
 // ---- Users -----
@@ -127,7 +127,7 @@ async function hasNoRC(username) {
   const rc = await getAccountRC(username)
   const commentUnitCost = 1 // TODO: comment transaction average cost
   const minComments = parseFloat(config.minPostRC) || 2
-  return rc > minComments * commentUnitCost
+  return rc < minComments * commentUnitCost
 }
 
 async function hasSetBeneficiary(username) {
@@ -163,7 +163,7 @@ async function notify(receiver, message) {
 }
 
 async function notifyUser (user, message) {
-  if (isTrue(config.await )) {
+  if (isTrue(config.notifyUser)) {
     await notify(user, message)
   }
 }
@@ -181,15 +181,15 @@ async function delegateToUser(username) {
   // 5. we have not delegated to the user before
   console.log(`may delegate to @${username}`)
   if (!await isMuted(username) && !await hasEnoughHP(username)
-    && await hasNoRC(username) && await hasSetBeneficiary(username)
-    && !await hasDelegatedTo(username))
+    && await hasNoRC(username) && !await hasDelegatedTo(username)
+    && (!isTrue(config.beneficiaryRemoval) || await hasSetBeneficiary(username)))
   {
     console.log(`delegate ${config.delegationAmount} HP to @${username}`)
     try {
       await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, parseFloat(config.delegationAmount))
     } catch(e) {
         // #10 if delegation process fail, notify the admin account
-      notifyAdmin(`Delegation Manager: failed to delegate Hive Power to the user @${username}`)
+      notifyAdmin(`Delegation Manager: failed to delegate Hive Power to @${username}. Error = ${e.message}`)
     }
 
     const user = getUser(username)
@@ -202,6 +202,10 @@ async function delegateToUser(username) {
 
 async function removeDelegationIfNeeded (username) {
   const user = getUser(username)
+  if (!user) {
+    console.log(`\tuser @${username} not found. cannot remove delegation.`)
+    return
+  }
 
   async function removeDelegation(status, message) {
     await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, 0)
