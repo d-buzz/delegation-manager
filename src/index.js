@@ -7,6 +7,7 @@ import { readReferredUsers, saveReferredUsers, addToReferredUsers, STATUS } from
 import { getMutedAccounts, getAccountRC, delegatablePower, usablePower, getAccount,
   hasBeneficiarySetting, delegatePower, sendMessage, getOutgoingDelegations }
   from './account'
+import { estimateCommentRC } from './rc'
 
 function isTrue(setting) {
   return setting && ('' + setting).toLowerCase() === 'true'
@@ -125,9 +126,9 @@ async function hasEnoughHP(username) {
 async function hasNoRC(username) {
   // console.log('\thas no RC ?', username)
   const rc = await getAccountRC(username)
-  const commentUnitCost = 1 // TODO: comment transaction average cost
-  const minComments = parseFloat(config.minPostRC) || 2
-  return rc < minComments * commentUnitCost
+  const minComments = parseFloat(config.minPostRC) || 3
+  // console.log(`@${username} can publish ${(rc / commentRcCost).toFixed(2)} comments with ${rc} RC`)
+  return rc && rc < minComments * commentRcCost
 }
 
 async function hasSetBeneficiary(username) {
@@ -174,14 +175,13 @@ async function notifyAdmin(message) {
 
 async function delegateToUser(username) {
   // delegate to user, when
-  // 1. user has little RC
+  // 1. we have not delegated to the user before
   // 2. user has low Hive Power (own + received delegation) < maxUserHP
-  // 3. default beneficiary setting is not removed
+  // 3. user has little RC
   // 4. user is not muted
-  // 5. we have not delegated to the user before
-  console.log(`may delegate to @${username}`)
-  if (!await isMuted(username) && !await hasEnoughHP(username)
-    && await hasNoRC(username) && !await hasDelegatedTo(username)
+  // 5. default beneficiary setting is not removed (optional)
+  if (!await hasDelegatedTo(username) && !await hasEnoughHP(username)
+    && await hasNoRC(username) && !await isMuted(username)
     && (!isTrue(config.beneficiaryRemoval) || await hasSetBeneficiary(username)))
   {
     console.log(`delegate ${config.delegationAmount} HP to @${username}`)
@@ -282,6 +282,17 @@ async function monitorDelegatorAccountHP() {
   setInterval(job, 8 * 3600 * 1000) // every 8 hours
 }
 
+let commentRcCost = null
+
+async function updateCommentRcCost() {
+  async function query() {
+    commentRcCost = await estimateCommentRC()
+    console.log('updated comment RC cost:', commentRcCost)
+  }
+  await query()
+  setInterval(query, 1 * 3600 * 1000) // every 1 hour
+}
+
 // ---  Main ---
 
 async function main() {
@@ -289,6 +300,7 @@ async function main() {
   saveReferredUsers(referredUsers)
   await updateDelegations()
   setInterval(updateDelegations, 120 * 1000) // query delegations every 2 mins
+  await updateCommentRcCost()
 
   await Promise.all([
     monitorNewAndInactiveUsers(),

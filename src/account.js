@@ -108,24 +108,32 @@ export async function claimRewards(wif, account) {
 }
 
 export async function getAccountRC(username) {
-  //capture account
-  const account = await getAccount(username)
-  const props = await dHiveClient.database.getDynamicGlobalProperties()
-  const CURRENT_UNIX_TIMESTAMP = parseInt((new Date(props.time).getTime() / 1000).toFixed(0))
-  //calculate available SP
-  const totalShares = parseFloat(account.vesting_shares) + parseFloat(account.received_vesting_shares) - parseFloat(account.delegated_vesting_shares);
-  //determine elapsed time since last RC update
-  const elapsed = CURRENT_UNIX_TIMESTAMP - account.voting_manabar.last_update_time;
-  const maxMana = totalShares * 1000000;
-  //calculate current mana for the 5 day period (432000 sec = 5 days)
-  const currentMana = parseFloat(account.voting_manabar.current_mana) + elapsed * maxMana / 432000;
-
-  if (currentMana > maxMana) {
-    currentMana = maxMana;
-  }
-  //determine percentage of available mana(RC)
-  // const currentManaPerc = currentMana * 100 / maxMana;
-  return currentMana
+  return new Promise((resolve, reject) => {
+    hiveClient.api.call(
+      'rc_api.find_rc_accounts',
+      { accounts: [username] },
+      function (err, res) {
+        if (err) {
+          reject(err)
+        } else {
+          if (res.rc_accounts && res.rc_accounts.length > 0) {
+            const rc = res.rc_accounts[0]
+            const CURRENT_UNIX_TIMESTAMP = parseInt((Date.now() / 1000).toFixed(0))
+            const elapsed = CURRENT_UNIX_TIMESTAMP - rc.rc_manabar.last_update_time
+            const maxMana = rc.max_rc
+            //calculate current mana for the 5 day period (432000 sec = 5 days)
+            let currentMana = parseFloat(rc.rc_manabar.current_mana) + (elapsed * maxMana) / 432000
+            if (currentMana > maxMana) {
+              currentMana = maxMana
+            }
+            resolve(currentMana)
+          } else {
+            resolve(null)
+          }
+        }
+      }
+    )
+  })
 }
 
 export async function delegatablePower(username) {

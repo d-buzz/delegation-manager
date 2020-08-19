@@ -4,7 +4,7 @@
   "delegationLength": 30,
   "beneficiaryRemoval": true,
   "checkCycleMins": 30,
-  "minPostRC": 2,
+  "minPostRC": 3,
   "muteAccount": "sportstalksocial",
   "hpWarning": 150,
   "maxUserHP": 30,
