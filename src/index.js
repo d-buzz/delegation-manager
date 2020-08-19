@@ -4,7 +4,13 @@
 import config from '../config' // #1 load config
 import { streamOperations, getOperationPerformer } from './operation'
 import { readReferredUsers, saveReferredUsers, addToReferredUsers } from './user'
-import { getMutedAccounts, getAccountRC, delegatablePower, usablePower, getAccount, hasBeneficiarySetting, sendMessage } from './account'
+import { getMutedAccounts, getAccountRC, delegatablePower, usablePower, getAccount, hasBeneficiarySetting, delegatePower, sendMessage } from './account'
+
+function isTrue(setting) {
+  return ('' + setting).toLowerCase() === 'true'
+}
+
+// ---- Users -----
 
 // object keeps the latest referred users
 // user status: { inactive, delegated, muted, expired, beneficiary_removed, graduated }
@@ -24,6 +30,8 @@ function containsUser(username) {
   const usernames = Object.keys(referredUsers)
   return usernames.includes(username)
 }
+
+// ---- Streaming Operations -----
 
 // #2.2 streaming operations and listen to account creation operation
 function whenReferredUserCreated(op) {
@@ -59,18 +67,27 @@ function whenReferredUserTakeActions(op) {
   }
 }
 
+// ---- Check User Status -----
+
 async function isMuted(username) {
-  const blacklist = await getMutedAccounts(config.muteAccount)
-  return blacklist.includes(username)
+  console.log('\tis muted ?', username)
+  if (config.muteAccount) {
+    const blacklist = await getMutedAccounts(config.muteAccount)
+    return blacklist.includes(username)
+  } else {
+    return false
+  }
 }
 
 async function hasEnoughHP(username) {
+  console.log('\thas enough HP ?', username)
   const hp = await usablePower(username)
   const maxHP = parseFloat(config.maxUserHP) || 30
   return hp >= maxHP
 }
 
 async function hasNoRC(username) {
+  console.log('\thas no RC ?', username)
   const rc = await getAccountRC(username)
   const commentUnitCost = 1 // TODO: comment transaction average cost
   const minComments = parseFloat(config.minPostRC) || 2
@@ -78,22 +95,27 @@ async function hasNoRC(username) {
 }
 
 async function hasSetBeneficiary(username) {
+  console.log('\thas set beneficiaries ?', username)
   const account = await getAccount(username)
-  if (hasBeneficiarySetting(account, config.delegationAccount)) {
-    return true
-  }
+  return hasBeneficiarySetting(account, config.delegationAccount)
 }
 
 async function hasDelegatedTo(username) {
+  console.log('\thas delegated to ?', username)
   return false
 }
 
-async function hasExceedsDelegatinLength(username) {
+async function hasExceededDelegatinLength(username) {
+  console.log('\thas exceeded delegation length ?', username)
   return false
 }
+
+// --- Manipulations ---
 
 async function notify(receiver, message) {
-  await sendMessage(process.env.ACTIVE_KEY, config.delegationAccount, receiver, message)
+  if (isTrue(config.notifyUser)) {
+    await sendMessage(process.env.ACTIVE_KEY, config.delegationAccount, receiver, message)
+  }
 }
 
 async function delegateToUser(username) {
@@ -103,6 +125,7 @@ async function delegateToUser(username) {
   // 3. default beneficiary setting is not removed
   // 4. user is not muted
   // 5. we have not delegated to the user before
+  console.log('will delegate to user', username)
   if (!await isMuted(username) && !await hasEnoughHP(username)
     && await hasNoRC(username) && await hasSetBeneficiary(username)
     && !await hasDelegatedTo(username))
@@ -125,6 +148,8 @@ async function removeDelegationIfNeeded(username) {
     await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, 0)
   }
 
+  console.log(`do we need to remove delegation to @${username}`)
+
   if (await hasEnoughHP(username)) {
     console.log(`remove delegation to @${username}`)
     await removeDelegation()
@@ -133,14 +158,16 @@ async function removeDelegationIfNeeded(username) {
     console.log(`remove delegation to @${username}`)
     await removeDelegation()
     notify(username, config.delegationMuteMsg)
-  } else if (await hasExceedsDelegatinLength(username)) { //
+  } else if (await hasExceededDelegatinLength(username)) { //
     console.log(`remove delegation to @${username}`)
     await removeDelegation()
     notify(username, config.delegationLengthMsg)
-  } else if (config.beneficiaryRemoval == true && await hasSetBeneficiary(username)) {
+  } else if (isTrue(config.beneficiaryRemoval) && !await hasSetBeneficiary(username)) {
     console.log(`remove delegation to @${username}`)
     await removeDelegation()
     notify(username, config.delegationBeneficiaryMsg)
+  } else {
+    console.log(`keep the delegation to @${username}`)
   }
 }
 
@@ -154,6 +181,8 @@ async function checkDelegatorAccountHP() {
     notify(config.adminAccount, config.hpWarningMsg)
   }
 }
+
+// --- Main ---
 
 async function processOperations() {
   // stream operations
@@ -169,9 +198,13 @@ async function processOperations() {
 async function monitoringAccounts() {
   console.log('#2 monitoring account status')
   const job = () => {
-    console.log('checking referred users status...')
+    // task 1: check delegated users status
     const users = getDelegatedUsers()
-    users.forEach(u => removeDelegationIfNeeded(u))
+    console.log(`we have delegated to ${users.length} users`, users)
+    if (users.length > 0) {
+      users.forEach(u => removeDelegationIfNeeded(u))
+    }
+    // task 2: check delegator status
     checkDelegatorAccountHP()
   }
   job()

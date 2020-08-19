@@ -4,6 +4,7 @@ const STEP = 100
 
 async function callHiveOnBoardApi(referrer, offset) {
   const url = `https://hiveonboard.com/api/referrer/${referrer}?limit=${STEP}&offset=${offset}`
+  console.log('access HiveOnBoard API', url)
   try{
     const { data } = await axios.get(url)
     return data.items
@@ -18,12 +19,16 @@ export async function getReferredAccounts(referrer) {
   let accounts = []
   let offset = 0
   let data = []
+  let saved = []
+  let fetched = false
   do {
     data = await callHiveOnBoardApi(referrer, offset)
-    if (data && data.length > 0) {
+    fetched = data && data.length > 0 && (saved.length === 0 || data[0].account !== saved[0].account)
+    if (fetched) {
       accounts = accounts.concat(data)
       offset += STEP
+      saved = data.concat()
     }
-  } while (data && data.length > 0)
+  } while (fetched)
   return accounts
 }
