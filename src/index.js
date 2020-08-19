@@ -14,16 +14,15 @@ function isTrue(setting) {
 
 // ---- Users -----
 
-// object keeps the latest referred users
+// object keeps the referred users
 let referredUsers = {}
 
-function getInactiveUsers() {
+async function getInactiveUsers() {
   const users = Object.values(referredUsers)
   return users.filter(u => u.status == null || u.status === STATUS.INACTIVE ).map(u => u.account)
 }
 
 async function getDelegatedUsers() {
-  await updateDelegations()
   const users = Object.values(referredUsers)
   return users.filter(u => u.status === STATUS.DELEGATED).map(u => u.account)
 }
@@ -46,7 +45,7 @@ let updatedTimestamp = null;
 
 async function updateDelegations() {
   // ignore the update if updated within 1 minutes
-  if (updatedTimestamp + 60 * 1000 > Date.now()) {
+  if (updatedTimestamp && updatedTimestamp + 60 * 1000 > Date.now()) {
     return
   }
 
@@ -65,10 +64,10 @@ async function updateDelegations() {
     }
   }
   updatedTimestamp = Date.now()
-  console.log('updated delegations data')
+  // console.log(`updated @${config.delegationAccount}'s delegation data`)
 }
 
-// ---- Streaming Operations -----
+// ---- Streaming Operations Callbacks -----
 
 // #2.2 streaming operations and listen to account creation operation
 function whenReferredUserCreated(op) {
@@ -92,11 +91,11 @@ function whenReferredUserCreated(op) {
 }
 
 // #5 listen to account activities, and delegate to the user if RC is less than minimum needs
-function whenReferredUserTakeActions(op) {
+async function whenReferredUserTakeActions(op) {
   const name = op.op[0]
   if (['comment', 'vote', 'transfer', 'custom_json'].includes(name)){
     const username = getOperationPerformer(op)
-    const users = getInactiveUsers()
+    const users = await getInactiveUsers()
     if (users.includes(username)) {
       console.log(`@${username} has performed [${name}] opeation at ${op.timestamp}`)
       delegateToUser(username)
@@ -209,16 +208,17 @@ async function removeDelegationIfNeeded (username) {
     user.status = status
     user.delegationRemovedAt = Date.now()
     updateUser(user)
-    console.log(`removed delegation to @${username}; changed status to ${status}`)
+    console.log(`\tremoved delegation to @${username}; changed status to ${status}`)
     await notifyUser(username, message)
   }
+
+  // console.log(`do we need to remove delegation to @${username} ?`)
 
   // remove delegation to the user, when
   // 1. user has enough Hive Power (own + received delegation)
   // 2. user is muted
   // 3. delegation length exceeds defined cycle
   // 4. default beneficiary setting is removed
-  console.log(`do we need to remove delegation to @${username} ?`)
   if (await hasEnoughHP(username)) {
     await removeDelegation(STATUS.GRADUATED, config.delegationMaxMsg)
   } else if (await isMuted(username)) {
@@ -228,28 +228,15 @@ async function removeDelegationIfNeeded (username) {
   } else if (isTrue(config.beneficiaryRemoval) && !await hasSetBeneficiary(username)) {
     await removeDelegation(STATUS.BENEFICIARY_REMOVED, config.delegationBeneficiaryMsg)
   } else {
-    console.log(`keep the delegation to @${username}`)
+    console.log(`\tkeep the delegation to @${username}`)
   }
 }
 
-async function checkDelegatorAccountHP() {
-  // #9 if the delegator account has no enough HP, send warning to the admin account
-  const hp = await delegatablePower(config.delegationAccount)
-  const hpWarning = parseFloat(config.hpWarning)
-  if (hpWarning >= 0 && hp < hpWarning) {
-    // send warning
-    console.log('no sufficient HP for delegation')
-    notifyAdmin(`Delegation Manager: The delegator @${config.delegationAccount} need more HP to continue supporting new users via delegation. You have only ${hp.toFixed(3)} now`)
-  } else {
-    console.log(`@${config.delegationAccount} has sufficient HP: ${hp.toFixed(3)} HP`)
-  }
-}
+// --- Monitoring Services ---
 
-// --- Main ---
-
-async function processOperations() {
+async function monitorNewAndInactiveUsers() {
   // stream operations
-  console.log('#1 stream operations starts')
+  console.log('#1 monitoring new and inactive referred users')
   await streamOperations([whenReferredUserCreated, whenReferredUserTakeActions], {
     from: 46146671
     // block 46146673 (@leo.ryan20 performs custom_json)
@@ -258,31 +245,51 @@ async function processOperations() {
   console.log('stream operations ended')
 }
 
-async function monitoringAccounts() {
-  console.log('#2 monitoring account status')
+async function monitorDelegatedUsers() {
+  console.log('#2 monitoring delegated users status')
   const job = async () => {
-    // task 1: check delegated users status
+    // check delegated users status
     const users = await getDelegatedUsers()
     console.log(`we have delegated to ${users.length} users`, users)
     if (users.length > 0) {
-      await Promise.all([users.map(u => removeDelegationIfNeeded(u))])
+      await Promise.all(users.map(u => removeDelegationIfNeeded(u)))
       console.log('check delegated users status: DONE')
     }
-    // task 2: check delegator status
-    await checkDelegatorAccountHP()
   }
   job()
   setInterval(job, parseFloat(config.checkCycleMins) * 60 * 1000)
 }
 
+async function monitorDelegatorAccountHP() {
+  console.log('#3 monitoring delegator account status')
+  const job = async () => {
+    // #9 if the delegator account has no enough HP, send warning to the admin account
+    const hp = await delegatablePower(config.delegationAccount)
+    const hpWarning = parseFloat(config.hpWarning)
+    if (hpWarning >= 0 && hp < hpWarning) {
+      // send warning
+      console.log(`The delegator @${config.delegationAccount} has no sufficient HP: ${hp.toFixed(3)} HP`)
+      notifyAdmin(`Delegation Manager: The delegator @${config.delegationAccount} need more HP to continue supporting new users via delegation. The delegator has only ${hp.toFixed(3)} now`)
+    } else {
+      console.log(`The delegator @${config.delegationAccount} has sufficient HP: ${hp.toFixed(3)} HP`)
+    }
+  }
+  job()
+  setInterval(job, 8 * 3600 * 1000) // every 8 hours
+}
+
+// ---  Main ---
+
 async function main() {
   referredUsers = await readReferredUsers()
   saveReferredUsers(referredUsers)
   await updateDelegations()
+  setInterval(updateDelegations, 120 * 1000) // query delegations every 2 mins
 
   await Promise.all([
-    processOperations(),
-    monitoringAccounts()
+    monitorNewAndInactiveUsers(),
+    monitorDelegatedUsers(),
+    monitorDelegatorAccountHP()
   ])
 }
 
