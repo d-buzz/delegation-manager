@@ -3,6 +3,7 @@ import dHiveClient from './dhive'
 import axios from 'axios'
 import { SCOT_API_HOST, HIVE_ENGINE_API_HOST } from './config'
 import { parseNumber } from './helper'
+import { PrivateKey } from '@hiveio/dhive'
 
 export async function getAccount(account) {
   return new Promise((resolve, reject) => {
@@ -156,6 +157,17 @@ export async function usablePower(username) {
   return vestSteem
 }
 
+export async function ownedPower(username) {
+  const account = await getAccount(username)
+  const avail = parseFloat(account.vesting_shares)
+
+  const props = await dHiveClient.database.getDynamicGlobalProperties();
+  const vestSteem = parseFloat(parseFloat(props.total_vesting_fund_steem) *
+    (parseFloat(avail) / parseFloat(props.total_vesting_shares)), 6);
+  return vestSteem
+}
+
+
 export function hasBeneficiarySetting(account, referrer) {
   let jsonMetadata = account.json_metadata
   if (jsonMetadata) {
@@ -189,6 +201,7 @@ export async function delegatePower(wif, username, receiver, hp) {
         vesting_shares: Number(vesting_shares).toFixed(6) + ' VESTS'
       }
     ]];
+    wif = PrivateKey.fromString(wif)
     dHiveClient.broadcast.sendOperations(ops, wif)
   } else {
     console.log('no enough Hiver Power for delegation')
@@ -201,8 +214,8 @@ export async function sendMessage(wif, from, to, message) {
     from,
     to,
     amount: '0.001 HIVE',
-    message
-  }, wif)
+    memo: message
+  }, PrivateKey.fromString(wif))
 }
 
 export async function getOutgoingDelegations(delegator) {

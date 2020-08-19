@@ -4,7 +4,7 @@
 import config from '../config' // #1 load config
 import { streamOperations, getOperationPerformer } from './operation'
 import { readReferredUsers, saveReferredUsers, addToReferredUsers, STATUS } from './user'
-import { getMutedAccounts, getAccountRC, delegatablePower, usablePower, getAccount,
+import { getMutedAccounts, getAccountRC, delegatablePower, ownedPower, getAccount,
   hasBeneficiarySetting, delegatePower, sendMessage, getOutgoingDelegations }
   from './account'
 import { estimateCommentRC } from './rc'
@@ -68,42 +68,6 @@ async function updateDelegations() {
   // console.log(`updated @${config.delegationAccount}'s delegation data`)
 }
 
-// ---- Streaming Operations Callbacks -----
-
-// #2.2 streaming operations and listen to account creation operation
-function whenReferredUserCreated(op) {
-  const name = op.op[0]
-  if (['create_claimed_account', 'account_create'].includes(name)) {
-    const account = op.op[1]
-    if (hasBeneficiarySetting(account, config.delegationAccount)) {
-      const username = account.new_account_name
-      console.log('referred user has been created:', username)
-      if (!containsUser(username)) {
-        updateUser({
-          account: username,
-          weight: referred[0].weight,
-          timestamp: new Date(op.timestamp + 'Z').getTime()
-        })
-      } else {
-        console.log(`referred user @${username} already exists. skip.`)
-      }
-    }
-  }
-}
-
-// #5 listen to account activities, and delegate to the user if RC is less than minimum needs
-async function whenReferredUserTakeActions(op) {
-  const name = op.op[0]
-  if (['comment', 'vote', 'transfer', 'custom_json'].includes(name)){
-    const username = getOperationPerformer(op)
-    const users = await getInactiveUsers()
-    if (users.includes(username)) {
-      console.log(`@${username} has performed [${name}] opeation at ${op.timestamp}`)
-      delegateToUser(username)
-    }
-  }
-}
-
 // ---- Check User Status -----
 
 async function isMuted(username) {
@@ -118,7 +82,7 @@ async function isMuted(username) {
 
 async function hasEnoughHP(username) {
   // console.log('\thas enough HP ?', username)
-  const hp = await usablePower(username)
+  const hp = await ownedPower(username)
   const maxHP = parseFloat(config.maxUserHP) || 30
   return hp >= maxHP
 }
@@ -127,14 +91,14 @@ async function hasNoRC(username) {
   // console.log('\thas no RC ?', username)
   const rc = await getAccountRC(username)
   const minComments = parseFloat(config.minPostRC) || 3
-  // console.log(`@${username} can publish ${(rc / commentRcCost).toFixed(2)} comments with ${rc} RC`)
+  // console.log(`@${username} can publish ${(rc / commentRcCost).toFixed(2)} comments with ${rc} RC`, rc && rc < minComments * commentRcCost)
   return rc && rc < minComments * commentRcCost
 }
 
 async function hasSetBeneficiary(username) {
   // console.log('\thas set beneficiaries ?', username)
   const account = await getAccount(username)
-  return hasBeneficiarySetting(account, config.delegationAccount)
+  return hasBeneficiarySetting(account, config.referrerAccount)
 }
 
 async function hasDelegatedTo(username) {
@@ -193,10 +157,13 @@ async function delegateToUser(username) {
     }
 
     const user = getUser(username)
-    user.status = STATUS.DELEGATED
-    user.delegatedAt = Date.now()
-    user.delegationAmount = parseFloat(config.delegationAmount)
-    updateUser(user)
+    if (user) {
+      user.status = STATUS.DELEGATED
+      user.delegatedAt = Date.now()
+      user.delegationAmount = parseFloat(config.delegationAmount)
+      updateUser(user)
+    }
+    await notifyUser(username, config.delegationMsg)
   }
 }
 
@@ -219,7 +186,7 @@ async function removeDelegationIfNeeded (username) {
   // console.log(`do we need to remove delegation to @${username} ?`)
 
   // remove delegation to the user, when
-  // 1. user has enough Hive Power (own + received delegation)
+  // 1. user has enough owned Hive Power
   // 2. user is muted
   // 3. delegation length exceeds defined cycle
   // 4. default beneficiary setting is removed
@@ -236,16 +203,49 @@ async function removeDelegationIfNeeded (username) {
   }
 }
 
+
+// ---- Streaming Operations Callbacks -----
+
+// #2.2 streaming operations and listen to account creation operation
+function whenReferredUserCreated(op) {
+  const name = op.op[0]
+  if (['create_claimed_account', 'account_create'].includes(name)) {
+    const account = op.op[1]
+    if (hasBeneficiarySetting(account, config.referrerAccount)) {
+      const username = account.new_account_name
+      console.log('referred user has been created:', username)
+      if (!containsUser(username)) {
+        updateUser({
+          account: username,
+          weight: referred[0].weight,
+          timestamp: new Date(op.timestamp + 'Z').getTime()
+        })
+      } else {
+        console.log(`referred user @${username} already exists. skip.`)
+      }
+    }
+  }
+}
+
+// #5 listen to account activities, and delegate to the user if RC is less than minimum needs
+async function whenReferredUserTakeActions(op) {
+  const name = op.op[0]
+  if (['comment', 'vote', 'transfer', 'custom_json'].includes(name)) {
+    const username = getOperationPerformer(op)
+    const users = await getInactiveUsers()
+    if (users.includes(username)) {
+      console.log(`@${username} has performed [${name}] opeation at ${op.timestamp}`)
+      delegateToUser(username)
+    }
+  }
+}
+
 // --- Monitoring Services ---
 
 async function monitorNewAndInactiveUsers() {
   // stream operations
   console.log('#1 monitoring new and inactive referred users')
-  await streamOperations([whenReferredUserCreated, whenReferredUserTakeActions], {
-    from: 46146671
-    // block 46146673 (@leo.ryan20 performs custom_json)
-    // block 45977166 (@leo.ryan20 account is created)
-  })
+  await streamOperations([whenReferredUserCreated, whenReferredUserTakeActions])
   console.log('stream operations ended')
 }
 
@@ -310,3 +310,4 @@ async function main() {
 }
 
 main()
+

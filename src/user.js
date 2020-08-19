@@ -16,7 +16,7 @@ export const STATUS = {
 
 export async function readReferredUsers() {
   // #2.1 read referred users from hiveonboard api
-  const users = await getReferredAccounts(config.delegationAccount)
+  const users = await getReferredAccounts(config.referrerAccount || config.delegationAccount)
   let usersMap = {}
   for (let user of users) {
     usersMap[user.account] = user

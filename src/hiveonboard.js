@@ -4,7 +4,7 @@ const STEP = 100
 
 async function callHiveOnBoardApi(referrer, offset) {
   const url = `https://hiveonboard.com/api/referrer/${referrer}?limit=${STEP}&offset=${offset}`
-  console.log('access HiveOnBoard API', url)
+  console.log('call HiveOnBoard API', url)
   try{
     const { data } = await axios.get(url)
     return data.items
