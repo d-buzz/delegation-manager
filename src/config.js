@@ -1,4 +1,9 @@
-const API_URLS = ["https://anyx.io", "https://api.hive.blog", "https://api.hivekings.com", "https://api.openhive.network"]
+const API_URLS = [
+  "https://api.hivekings.com",
+  "https://anyx.io",
+  "https://api.hive.blog",
+  "https://api.openhive.network"
+]
 const SCOT_API_HOST = 'https://scot-api.steem-engine.com'
 const HIVE_ENGINE_API_HOST = 'https://api.hive-engine.com/rpc/contracts'
 

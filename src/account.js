@@ -196,3 +196,13 @@ export async function sendMessage(wif, from, to, message) {
     message
   }, wif)
 }
+
+export async function getOutgoingDelegations(delegator) {
+  const data = await dHiveClient.database.getVestingDelegations(delegator, "", 100)
+  const props = await dHiveClient.database.getDynamicGlobalProperties();
+  data.forEach(d => {
+    d.hive_power = parseFloat(parseFloat(props.total_vesting_fund_steem) *
+      (parseFloat(d.vesting_shares) / parseFloat(props.total_vesting_shares)), 6);
+  })
+  return data
+}
