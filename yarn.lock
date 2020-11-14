@@ -846,7 +846,7 @@
     lodash "^4.17.19"
     to-fast-properties "^2.0.0"
 
-"@hiveio/dhive@^0.14.8":
+"@hiveio/dhive@^0.14.1", "@hiveio/dhive@^0.14.8":
   version "0.14.11"
   resolved "https://registry.npmjs.org/@hiveio/dhive/-/dhive-0.14.11.tgz#01d3d67b8276c9dd4c2f89984779259857068645"
   integrity sha512-inKw3adkr1tsRVxHAD97q0TkX5fi+BD9HmSPQnVdJVAm+f9DpmeMcs4oVPXZ/MNQEeHsXdwIXxSLhw1qtTFrLA==
@@ -885,6 +885,14 @@
     retry "^0.12.0"
     secure-random "^1.1.2"
     ws "^3.3.2"
+
+"@splinterlands/hive-interface@^2.1.3":
+  version "2.1.3"
+  resolved "https://registry.npmjs.org/@splinterlands/hive-interface/-/hive-interface-2.1.3.tgz#fa06c27a6b64a034c9d06d8ae4e9290dbb9aff79"
+  integrity sha512-Ao5lQvOCR1jB42ydx6aVNkK8W6k27780UT6tV2RnaBxB3F71NGOcMFS5SDrlNqOFKdT8MTriJqzUhc+lp75iCg==
+  dependencies:
+    "@hiveio/dhive" "^0.14.1"
+    sscjs "0.0.8"
 
 "@steemit/libcrypto@^1.0.1":
   version "1.0.1"
@@ -958,7 +966,7 @@ atob@^2.1.2:
   resolved "https://registry.npmjs.org/atob/-/atob-2.1.2.tgz#6d9517eb9e030d2436666651e86bd9f6f13533c9"
   integrity sha512-Wm6ukoaOGJi/73p/cl2GvLjTI5JM1k/O14isD73YML8StrH/7/lRFgmg8nICZgD3bZZvjwCGxtMOD3wWNAu8cg==
 
-axios@^0.19.2:
+axios@^0.19.0, axios@^0.19.2:
   version "0.19.2"
   resolved "https://registry.npmjs.org/axios/-/axios-0.19.2.tgz#3ea36c5d8818d0d5f8a8a97a6d36b86cdc00cb27"
   integrity sha512-fjgm5MvRHLhx+osE2xoekY70AhARk3a6hkN+3Io1jc00jtquGvxYlKlsFUhmUET0V5te6CcZI7lcv2Ym61mjHA==
@@ -2404,6 +2412,13 @@ split-string@^3.0.1, split-string@^3.0.2:
   integrity sha512-NzNVhJDYpwceVVii8/Hu6DKfD2G+NrQHlS/V/qgv763EYudVwEcMQNxd2lh+0VrUByXN/oJkl5grOhYWvQUYiw==
   dependencies:
     extend-shallow "^3.0.0"
+
+sscjs@0.0.8:
+  version "0.0.8"
+  resolved "https://registry.npmjs.org/sscjs/-/sscjs-0.0.8.tgz#68b7c8901b9e22cc39482a8e6d2f28eeae898cc5"
+  integrity sha512-uu7zaFHUqUL5YySNrRg0MKN9PtZA356mX080ETJgGXNy7Wdc1RgwxHWbZJySTyywZRjn3BdIZRrNCEId6AS+Yw==
+  dependencies:
+    axios "^0.19.0"
 
 static-extend@^0.1.1:
   version "0.1.2"

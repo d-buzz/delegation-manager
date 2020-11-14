@@ -1,16 +1,34 @@
-import dHiveClient from './dhive'
+// import dHiveClient from './dhive'
+import hiveInterface from './hive-interface'
+
+// export async function streamOperations(callbacks, options = {}) {
+//   return new Promise((resolve, reject) => {
+//     const stream = dHiveClient.blockchain.getOperationsStream(options)
+//     stream.on('data', (op) => {
+//       if (callbacks && callbacks.length > 0) {
+//         callbacks.forEach(callback => {
+//           callback(op)
+//         })
+//       }
+//     })
+//   })
+// }
 
 export async function streamOperations(callbacks, options = {}) {
-  return new Promise((resolve, reject) => {
-    const stream = dHiveClient.blockchain.getOperationsStream(options)
-    stream.on('data', (op) => {
+  return await hiveInterface.stream({
+    on_op: (op, block_num, block_id, previous_block, trx_id, timestamp) => {
+      const operation = {
+        trx_id,
+        timestamp,
+        op,
+      }
       if (callbacks && callbacks.length > 0) {
         callbacks.forEach(callback => {
-          callback(op)
+          callback(operation)
         })
       }
-    })
-  })
+    },
+  });
 }
 
 export function getOperationPerformer(op) {
