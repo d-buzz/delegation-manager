@@ -27,8 +27,8 @@
   },
   "homepage": "https://github.com/voltairez/delegation-manager#readme",
   "dependencies": {
-    "@hiveio/dhive": "^0.14.1",
-    "@hiveio/hive-js": "^0.8.3",
+    "@hiveio/dhive": "^0.14.8",
+    "@hiveio/hive-js": "^0.8.5",
     "axios": "^0.19.2",
     "dotenv": "^8.2.0"
   },

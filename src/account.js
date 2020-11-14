@@ -81,16 +81,16 @@ export async function claimTokenRewards(wif, account, token) {
 export async function claimRewards(wif, account) {
   const info = await getAccount(account)
   return new Promise((resolve, reject) => {
-    if (parseNumber(info.reward_steem_balance) > 0
-      || parseNumber(info.reward_sbd_balance) > 0
+    if (parseNumber(info.reward_hive_balance) > 0
+      || parseNumber(info.reward_hbd_balance) > 0
       || parseNumber(info.reward_vesting_balance) > 0
     ) {
       console.log(`Claim rewards for @${account}:`,
-        info.reward_steem_balance,
-        info.reward_sbd_balance,
+        info.reward_hive_balance,
+        info.reward_hbd_balance,
         info.reward_vesting_balance
       )
-      hiveClient.broadcast.claimRewardBalance(wif, account, info.reward_steem_balance, info.reward_sbd_balance, info.reward_vesting_balance, function (err, res) {
+      hiveClient.broadcast.claimRewardBalance(wif, account, info.reward_hive_balance, info.reward_hbd_balance, info.reward_vesting_balance, function (err, res) {
         if (err) {
           reject(err)
         } else {
@@ -99,8 +99,8 @@ export async function claimRewards(wif, account) {
       });
     } else {
       console.log(`No rewards to claim for @${account}:`,
-        info.reward_steem_balance,
-        info.reward_sbd_balance,
+        info.reward_hive_balance,
+        info.reward_hbd_balance,
         info.reward_vesting_balance
       )
       resolve('no rewards to claim')
@@ -142,7 +142,7 @@ export async function delegatablePower(username) {
   const avail = parseFloat(account.vesting_shares) - (parseFloat(account.to_withdraw) - parseFloat(account.withdrawn)) / 1e6 - parseFloat(account.delegated_vesting_shares);
 
   const props = await dHiveClient.database.getDynamicGlobalProperties();
-  const vestSteem = parseFloat(parseFloat(props.total_vesting_fund_steem) *
+  const vestSteem = parseFloat(parseFloat(props.total_vesting_fund_hive) *
     (parseFloat(avail) / parseFloat(props.total_vesting_shares)), 6);
   return vestSteem
 }
@@ -152,7 +152,7 @@ export async function usablePower(username) {
   const avail = parseFloat(account.vesting_shares) + parseFloat(account.received_vesting_shares);
 
   const props = await dHiveClient.database.getDynamicGlobalProperties();
-  const vestSteem = parseFloat(parseFloat(props.total_vesting_fund_steem) *
+  const vestSteem = parseFloat(parseFloat(props.total_vesting_fund_hive) *
     (parseFloat(avail) / parseFloat(props.total_vesting_shares)), 6);
   return vestSteem
 }
@@ -162,7 +162,7 @@ export async function ownedPower(username) {
   const avail = parseFloat(account.vesting_shares)
 
   const props = await dHiveClient.database.getDynamicGlobalProperties();
-  const vestSteem = parseFloat(parseFloat(props.total_vesting_fund_steem) *
+  const vestSteem = parseFloat(parseFloat(props.total_vesting_fund_hive) *
     (parseFloat(avail) / parseFloat(props.total_vesting_shares)), 6);
   return vestSteem
 }
@@ -191,7 +191,7 @@ export async function delegatePower(wif, username, receiver, hp) {
     1e6 -
     parseFloat(account.delegated_vesting_shares);
   const props = await dHiveClient.database.getDynamicGlobalProperties();
-  const vesting_shares = parseFloat(hp * parseFloat(props.total_vesting_shares) / parseFloat(props.total_vesting_fund_steem));
+  const vesting_shares = parseFloat(hp * parseFloat(props.total_vesting_shares) / parseFloat(props.total_vesting_fund_hive));
   if (avail > vesting_shares) {
     const ops = [[
       'delegate_vesting_shares',
@@ -222,7 +222,7 @@ export async function getOutgoingDelegations(delegator) {
   const data = await dHiveClient.database.getVestingDelegations(delegator, "", 100)
   const props = await dHiveClient.database.getDynamicGlobalProperties();
   data.forEach(d => {
-    d.hive_power = parseFloat(parseFloat(props.total_vesting_fund_steem) *
+    d.hive_power = parseFloat(parseFloat(props.total_vesting_fund_hive) *
       (parseFloat(d.vesting_shares) / parseFloat(props.total_vesting_shares)), 6);
   })
   return data
