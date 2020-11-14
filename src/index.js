@@ -247,7 +247,7 @@ async function monitorNewAndInactiveUsers() {
   // stream operations
   console.log('#1 monitoring new and inactive referred users')
   await streamOperations([whenReferredUserCreated, whenReferredUserTakeActions])
-  console.log('stream operations ended')
+  console.log('stream operations started')
 }
 
 async function monitorDelegatedUsers() {
