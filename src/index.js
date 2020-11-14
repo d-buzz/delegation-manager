@@ -211,13 +211,14 @@ function whenReferredUserCreated(op) {
   const name = op.op[0]
   if (['create_claimed_account', 'account_create'].includes(name)) {
     const account = op.op[1]
-    if (hasBeneficiarySetting(account, config.referrerAccount)) {
+    const referred = hasBeneficiarySetting(account, config.referrerAccount)
+    if (referred) {
       const username = account.new_account_name
       console.log('referred user has been created:', username)
       if (!containsUser(username)) {
         updateUser({
           account: username,
-          weight: referred[0].weight,
+          weight: referred.weight,
           timestamp: new Date(op.timestamp + 'Z').getTime()
         })
       } else {

@@ -176,7 +176,7 @@ export function hasBeneficiarySetting(account, referrer) {
     if (beneficiaries && beneficiaries.length > 0) {
       const referred = beneficiaries.filter(b => b.name === referrer)
       if (referred && referred.length > 0 && referred[0].label === 'referrer') {
-        return true
+        return referred[0]
       }
     }
   }
