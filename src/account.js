@@ -183,6 +183,20 @@ export function hasBeneficiarySetting(account, referrer) {
   return false
 }
 
+export function delegateRC(posting_key, username, receiver, max_rc) {
+  return new Promise(resolve => {
+      const json = JSON.stringify(['delegate_rc', {
+          from: username,
+          delegatees: receiver,
+          max_rc: max_rc,
+      }]);
+
+      dHiveClient.broadcast.customJson(posting_key, [], [username], 'rc', json, function (err, result) {
+          resolve(err)
+      });
+  });
+}
+
 export async function delegatePower(wif, username, receiver, hp) {
   const account = await getAccount(username)
   const avail = parseFloat(account.vesting_shares) -

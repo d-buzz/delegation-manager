@@ -5,7 +5,7 @@ import config from '../config' // #1 load config
 import { streamOperations, getOperationPerformer } from './operation'
 import { readReferredUsers, saveReferredUsers, addToReferredUsers, STATUS } from './user'
 import { getMutedAccounts, getAccountRC, delegatablePower, ownedPower, getAccount,
-  hasBeneficiarySetting, delegatePower, sendMessage, getOutgoingDelegations }
+  hasBeneficiarySetting, delegatePower, sendMessage, getOutgoingDelegations, delegateRC }
   from './account'
 import { estimateCommentRC } from './rc'
 
@@ -148,14 +148,14 @@ async function delegateToUser(username) {
     && await hasNoRC(username) && !await isMuted(username)
     && (!isTrue(config.beneficiaryRemoval) || await hasSetBeneficiary(username)))
   {
-    console.log(`delegate ${config.delegationAmount} HP to @${username}`)
+    console.log(`delegate ${config.delegationAmount} RC to @${username}`)
     try {
-      await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, parseFloat(config.delegationAmount))
+      await delegateRC(process.env.POSTING_KEY, config.delegationAccount, username, config.delegationAmount)
     } catch(e) {
-        // #10 if delegation process fail, notify the admin account
+      // #10 if delegation process fail, notify the admin account
       notifyAdmin(`Delegation Manager: failed to delegate Hive Power to @${username}. Error = ${e.message}`)
     }
-
+    
     const user = getUser(username)
     if (user) {
       user.status = STATUS.DELEGATED
@@ -173,9 +173,9 @@ async function removeDelegationIfNeeded (username) {
     console.log(`\tuser @${username} not found. cannot remove delegation.`)
     return
   }
-
+  
   async function removeDelegation(status, message) {
-    await delegatePower(process.env.ACTIVE_KEY, config.delegationAccount, username, 0)
+    await delegateRC(process.env.POSTING_KEY, config.delegationAccount, username, 0)
     user.status = status
     user.delegationRemovedAt = Date.now()
     updateUser(user)
